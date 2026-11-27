@@ -11,6 +11,8 @@ export type Classification = 'mecanico' | 'julgamento';
 /** O que o classificador precisa medir nos dados da origem. */
 export interface ProbeRequest {
   zeroDate?: boolean;
+  /** texto vazio na origem: o Oracle grava '' como NULL */
+  emptyStrings?: boolean;
   nulls?: boolean;
   distinct?: boolean;
   overflow?: { unit: 'CHAR' | 'BYTE'; limit: number };
@@ -21,6 +23,7 @@ export interface Probe {
   /** o teto de linhas (PROBE_MAX_ROWS) foi atingido: medicao sobre amostra */
   sampled?: boolean;
   zeroDates?: number;
+  emptyStrings?: number;
   nullCount?: number;
   distinct?: { value: unknown; count: number }[];
   overflow?: { unit: 'CHAR' | 'BYTE'; limit: number; valuesAbove: number; maxObserved: number | null };
@@ -44,6 +47,8 @@ const INT_DIGITS: Record<string, number> = {
 const DATES = new Set(['DATETIME', 'TIMESTAMP', 'DATE']);
 const TEXTS = new Set(['TINYTEXT', 'TEXT', 'MEDIUMTEXT', 'LONGTEXT']);
 const ORA_STRINGS = new Set(['VARCHAR2', 'NVARCHAR2', 'CHAR', 'NCHAR']);
+const ORA_TEXT = new Set([...ORA_STRINGS, 'CLOB', 'NCLOB']);
+const SRC_TEXT = new Set(['CHAR', 'VARCHAR', 'TINYTEXT', 'TEXT', 'MEDIUMTEXT', 'LONGTEXT', 'ENUM', 'SET']);
 const MYSQL_MAX_BYTES: Record<string, number> = { utf8mb4: 4, utf8mb3: 3, utf8: 3, latin1: 1, ascii: 1 };
 
 function maxBytesPerChar(col: NormColumn): number {
@@ -74,6 +79,7 @@ export function planProbe(src: NormColumn, tgt: NormColumn): ProbeRequest {
   if (DATES.has(src.dataType)) req.zeroDate = true;
   if (src.nullable && !tgt.nullable) req.nulls = true;
   if (isTinyBool(src)) req.distinct = true;
+  if (SRC_TEXT.has(src.dataType) && ORA_TEXT.has(tgt.dataType)) req.emptyStrings = true;
   const overflow = overflowRequest(src, tgt);
   if (overflow) req.overflow = overflow;
   return req;
@@ -182,6 +188,17 @@ export function classify(src: NormColumn, tgt: NormColumn, probe: Probe | null, 
       });
     } else {
       warnings.push(`destino menor que o pior caso da origem (${tgt.type}), mas os dados atuais cabem (máx. ${o.maxObserved ?? 0}${unit})`);
+    }
+  }
+
+  if (probe?.emptyStrings) {
+    if (!tgt.nullable) {
+      judgments.push({
+        rule: 'EMPTY_STRING_NOT_NULL',
+        reason: `${probe.emptyStrings} texto(s) vazio(s) na origem: o Oracle grava '' como NULL e o destino é NOT NULL (a carga falha)`,
+      });
+    } else {
+      warnings.push(`${probe.emptyStrings} texto(s) vazio(s) na origem viram NULL no Oracle (o Oracle não distingue '' de NULL)`);
     }
   }
 

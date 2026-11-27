@@ -16,6 +16,7 @@ export interface ProbeView {
   unit?: 'CHAR' | 'BYTE';
   targetLimit?: number;
   zeroDates?: number;
+  emptyStrings?: number;
   nullCount?: number;
   distinct?: { value: unknown; count: number }[];
 }

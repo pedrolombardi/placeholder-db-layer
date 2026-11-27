@@ -32,6 +32,7 @@ export interface Check {
 
 interface ColumnFacts {
   nulls: number;
+  emptyStrings: number;
   invalidDates: number;
   above: number;
   maxLength: number | null;
@@ -39,6 +40,7 @@ interface ColumnFacts {
 }
 
 const STRING_TYPES = new Set(['VARCHAR2', 'NVARCHAR2', 'CHAR', 'NCHAR']);
+const TEXT_TARGET = new Set([...STRING_TYPES, 'CLOB', 'NCLOB']);
 const NUMERIC_SOURCE = new Set(['TINYINT', 'SMALLINT', 'MEDIUMINT', 'INT', 'INTEGER', 'BIGINT', 'DECIMAL', 'NUMERIC']);
 const SOURCE_DATES = new Set(['DATE', 'DATETIME', 'TIMESTAMP']);
 
@@ -54,6 +56,9 @@ export async function sourceFacts(db: DbAdapter, t: PlannedTable): Promise<Map<s
     const s = c.source!;
     const q = d.quote(s.rawName);
     select.push(`SUM(CASE WHEN ${q} IS NULL THEN 1 ELSE 0 END) AS ${d.quote(`n${i}`)}`);
+    if (TEXT_TARGET.has(c.base) && db.engine === 'mysql') {
+      select.push(`SUM(CASE WHEN ${q} = '' THEN 1 ELSE 0 END) AS ${d.quote(`e${i}`)}`);
+    }
     if (isDateType(c.base) && SOURCE_DATES.has(s.dataType) && db.engine === 'mysql') {
       const txt = `CAST(${q} AS CHAR)`;
       select.push(`SUM(CASE WHEN ${txt} LIKE '0000-%' OR SUBSTRING(${txt}, 6, 2) = '00' OR SUBSTRING(${txt}, 9, 2) = '00' THEN 1 ELSE 0 END) AS ${d.quote(`z${i}`)}`);
@@ -74,6 +79,7 @@ export async function sourceFacts(db: DbAdapter, t: PlannedTable): Promise<Map<s
     const intMax = row[`i${i}`];
     out.set(c.name, {
       nulls: toIntOrNull(row[`n${i}`], 'nulls') ?? 0,
+      emptyStrings: toIntOrNull(row[`e${i}`], 'emptyStrings') ?? 0,
       invalidDates: toIntOrNull(row[`z${i}`], 'invalidDates') ?? 0,
       above: toIntOrNull(row[`a${i}`], 'above') ?? 0,
       maxLength: toIntOrNull(row[`m${i}`], 'maxLength'),
@@ -114,6 +120,11 @@ function toBind(c: PlannedColumn, v: unknown, converted: { n: number }): string 
     }
     return s.length === 10 ? `${s} 00:00:00` : s.slice(0, 19);
   }
+  // Oracle grava '' como NULL: o sandbox reproduz isso (e um destino NOT NULL recusa)
+  if (v === '' && TEXT_TARGET.has(c.base)) {
+    converted.n++;
+    return null;
+  }
   const src = c.source;
   if (src && (src.dataType === 'DECIMAL' || src.dataType === 'NUMERIC') && typeof v === 'number') {
     // o anonimizador perturba os decimais; o dataset volta ao tipo da origem
@@ -151,6 +162,7 @@ export async function validatePlan(registry: Registry, deps: Deps, conflicts: Pl
         if (f.intDigits !== null && f.intDigits > c.precision - scale) issues.type_precision_scale.push(`${id}: ${f.intDigits} digitos inteiros nao cabem em ${c.type}`);
       }
       if (f.invalidDates > 0 && !c.onInvalid) issues.type_precision_scale.push(`${id}: ${f.invalidDates} data(s) invalida(s) na origem sem decisao no plano`);
+      if (!c.nullable && f.emptyStrings > 0) issues.null_count.push(`${id}: ${f.emptyStrings} texto(s) vazio(s) na origem viram NULL no Oracle e o destino e NOT NULL`);
       if (!c.nullable && f.nulls > 0) issues.null_count.push(`${id}: ${f.nulls} nulo(s) na origem e o destino e NOT NULL`);
     }
   }

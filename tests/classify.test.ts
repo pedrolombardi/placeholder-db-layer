@@ -141,3 +141,30 @@ describe('normalizacao do catalogo', () => {
     expect([ts.dataType, ts.precision]).toEqual(['TIMESTAMP', 6]);
   });
 });
+
+describe("regra nova: '' vira NULL no Oracle", () => {
+  const src = col({ dataType: 'VARCHAR', type: 'VARCHAR(60)', length: 60, nullable: false });
+  const tgtNotNull = col({ dataType: 'VARCHAR2', type: 'VARCHAR2(60 CHAR)', length: 60, nullable: false });
+  const tgtNullable = col({ dataType: 'VARCHAR2', type: 'VARCHAR2(60 CHAR)', length: 60, nullable: true });
+
+  it('texto na origem e texto no Oracle: o diff mede os vazios', () => {
+    expect(planProbe(src, tgtNotNull).emptyStrings).toBe(true);
+    expect(planProbe(col({ dataType: 'INT', type: 'INT', length: null, lengthSemantics: null }), col({ dataType: 'NUMBER', type: 'NUMBER(10)' })).emptyStrings).toBeUndefined();
+  });
+
+  it('destino NOT NULL com vazio na origem: julgamento (a carga falharia)', () => {
+    const r = classify(src, tgtNotNull, { totalRows: 10, emptyStrings: 2 }, { targetCheckValues: null });
+    expect(r.classification).toBe('julgamento');
+    expect(r.rules).toEqual(['EMPTY_STRING_NOT_NULL']);
+  });
+
+  it('destino que aceita NULL: mecanico, mas com aviso (o dado muda de significado)', () => {
+    const r = classify(src, tgtNullable, { totalRows: 10, emptyStrings: 2 }, { targetCheckValues: null });
+    expect(r.classification).toBe('mecanico');
+    expect(r.warnings.join()).toContain("2 texto(s) vazio(s)");
+  });
+
+  it('sem vazios na origem, nada muda (o seed continua 15/5)', () => {
+    expect(classify(src, tgtNotNull, { totalRows: 10, emptyStrings: 0 }, { targetCheckValues: null }).classification).toBe('mecanico');
+  });
+});

@@ -31,6 +31,9 @@ export function sqlProbeRunner(db: DbAdapter): ProbeRunner {
             `SUM(CASE WHEN ${txt} LIKE '0000-%' OR SUBSTRING(${txt}, 6, 2) = '00' OR SUBSTRING(${txt}, 9, 2) = '00' THEN 1 ELSE 0 END) AS ${d.quote(`z${i}`)}`,
           );
         }
+        if (req.emptyStrings && db.engine === 'mysql') {
+          select.push(`SUM(CASE WHEN ${q} = '' THEN 1 ELSE 0 END) AS ${d.quote(`e${i}`)}`);
+        }
         if (req.nulls) select.push(`SUM(CASE WHEN ${q} IS NULL THEN 1 ELSE 0 END) AS ${d.quote(`n${i}`)}`);
         let overflow = false;
         if (req.overflow) {
@@ -53,6 +56,7 @@ export function sqlProbeRunner(db: DbAdapter): ProbeRunner {
       for (const { name, i, req, overflow } of plan) {
         const probe: Probe = { totalRows, ...(sampled ? { sampled: true } : {}) };
         if (req.zeroDate) probe.zeroDates = toIntOrNull(row[`z${i}`], 'zeroDates') ?? 0;
+        if (req.emptyStrings) probe.emptyStrings = toIntOrNull(row[`e${i}`], 'emptyStrings') ?? 0;
         if (req.nulls) probe.nullCount = toIntOrNull(row[`n${i}`], 'nullCount') ?? 0;
         if (overflow && req.overflow) {
           probe.overflow = {
