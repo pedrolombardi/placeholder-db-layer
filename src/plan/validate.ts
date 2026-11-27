@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import oracledb from 'oracledb';
 import { Registry } from '../db/registry';
 import { DbAdapter } from '../db/types';
@@ -5,7 +6,7 @@ import { Deps } from '../deps';
 import { HttpError } from '../http';
 import { dialectFor } from '../schema/dialect';
 import { toInt, toIntOrNull } from '../schema/num';
-import { PlanConflict, PlannedColumn, PlannedTable, isDateType, isInvalidDate, loadOrder, planTables } from './model';
+import { PlanConflict, PlannedColumn, PlannedTable, isDateType, isInvalidDate, loadOrder, planTables, sandboxPrefix, sandboxTable } from './model';
 
 /**
  * Validacao deterministica de um plano aprovado (documento da Fase 6):
@@ -124,7 +125,7 @@ function toBind(c: PlannedColumn, v: unknown, converted: { n: number }): string 
 
 const ORA = (err: { errorNum?: number; message?: string }) => err.errorNum ?? Number(/ORA-(\d+)/.exec(err.message ?? '')?.[1] ?? 0);
 
-export async function validatePlan(registry: Registry, deps: Deps, conflicts: PlanConflict[], dataset: LoadTable[]) {
+export async function validatePlan(registry: Registry, deps: Deps, conflicts: PlanConflict[], dataset: LoadTable[], runKey: string = randomUUID()) {
   const sandbox = registry.sandbox;
   if (!sandbox) throw new HttpError(503, 'SANDBOX_UNAVAILABLE', 'schema sandbox nao configurado');
   const [source, target] = await Promise.all([deps.introspect(registry.source), deps.introspect(registry.target)]);
@@ -154,12 +155,19 @@ export async function validatePlan(registry: Registry, deps: Deps, conflicts: Pl
     }
   }
 
-  // 2. Carga do dataset anonimizado no sandbox, nos tipos planejados
-  await sandbox.exclusive(() => sandbox.withConnection(async (conn) => {
-    const loaded = tables.filter((t) => dataset.some((d) => d.name.toLowerCase() === t.name));
+  // 2. Carga do dataset anonimizado no sandbox, nos tipos planejados, em
+  //    tabelas proprias desta execucao (prefixo), apagadas no fim.
+  const prefix = sandboxPrefix(runKey);
+  const sbx = (t: PlannedTable) => sandboxTable(prefix, t.rawName);
+  const loaded = tables.filter((t) => dataset.some((d) => d.name.toLowerCase() === t.name));
+  const dropAll = async (conn: oracledb.Connection) => {
     for (const t of [...loaded].reverse()) {
-      await conn.execute(`BEGIN EXECUTE IMMEDIATE 'DROP TABLE "${t.rawName}" CASCADE CONSTRAINTS PURGE'; EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF; END;`);
+      await conn.execute(`BEGIN EXECUTE IMMEDIATE 'DROP TABLE "${sbx(t)}" CASCADE CONSTRAINTS PURGE'; EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF; END;`);
     }
+  };
+  await sandbox.withConnection(async (conn) => {
+    await dropAll(conn);
+    try {
     for (const t of loaded) {
       const data = dataset.find((d) => d.name.toLowerCase() === t.name)!;
       const index = new Map(data.columns.map((c, i) => [c.name.toLowerCase(), i]));
@@ -168,8 +176,8 @@ export async function validatePlan(registry: Registry, deps: Deps, conflicts: Pl
         isDateType(c.base) ? data.rows.filter((r) => { const v = r[index.get(c.name) ?? -1]; return v !== null && v !== undefined && isInvalidDate(String(v)); }).length : 0;
 
       const defs = t.columns.map((c) => `"${c.rawName}" ${c.type}${sandboxNullable(c, datasetInvalid(c), invalidSource.get(`${t.name}.${c.name}`) ?? 0) ? '' : ' NOT NULL'}`);
-      if (t.primaryKey.length > 0) defs.push(`CONSTRAINT "PK_${t.rawName}" PRIMARY KEY (${t.primaryKey.map((k) => `"${rawOf(t, k)}"`).join(', ')})`);
-      await conn.execute(`CREATE TABLE "${t.rawName}" (${defs.join(', ')})`);
+      if (t.primaryKey.length > 0) defs.push(`CONSTRAINT "${`PK_${sbx(t)}`.slice(0, 128)}" PRIMARY KEY (${t.primaryKey.map((k) => `"${rawOf(t, k)}"`).join(', ')})`);
+      await conn.execute(`CREATE TABLE "${sbx(t)}" (${defs.join(', ')})`);
 
       const binds = data.rows.map((r) => t.columns.map((c) => toBind(c, index.has(c.name) ? r[index.get(c.name)!] : null, converted.get(c.name)!)));
       const placeholders = t.columns.map((c, i) => (isDateType(c.base) ? `TO_TIMESTAMP(:${i + 1}, 'YYYY-MM-DD HH24:MI:SS')` : `:${i + 1}`));
@@ -177,7 +185,7 @@ export async function validatePlan(registry: Registry, deps: Deps, conflicts: Pl
       let errors: { offset: number; code: number; message: string }[] = [];
       if (binds.length > 0) {
         const res = await conn.executeMany(
-          `INSERT INTO "${t.rawName}" (${t.columns.map((c) => `"${c.rawName}"`).join(', ')}) VALUES (${placeholders.join(', ')})`,
+          `INSERT INTO "${sbx(t)}" (${t.columns.map((c) => `"${c.rawName}"`).join(', ')}) VALUES (${placeholders.join(', ')})`,
           binds,
           { batchErrors: true, autoCommit: true, bindDefs },
         );
@@ -195,7 +203,7 @@ export async function validatePlan(registry: Registry, deps: Deps, conflicts: Pl
 
       // nulos no sandbox = nulos do dataset + conversoes decididas no plano
       const nullSel = t.columns.map((c, i) => `SUM(CASE WHEN "${c.rawName}" IS NULL THEN 1 ELSE 0 END) AS "n${i}"`);
-      const r = await conn.execute<Record<string, unknown>>(`SELECT ${nullSel.join(', ')} FROM "${t.rawName}"`, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
+      const r = await conn.execute<Record<string, unknown>>(`SELECT ${nullSel.join(', ')} FROM "${sbx(t)}"`, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
       const row = r.rows?.[0] ?? {};
       const failed = new Set(errors.map((e) => e.offset));
       t.columns.forEach((c, i) => {
@@ -211,9 +219,9 @@ export async function validatePlan(registry: Registry, deps: Deps, conflicts: Pl
       for (const fk of t.foreignKeys) {
         const parent = loaded.find((p) => p.name === fk.refTable);
         if (!parent || fk.columns.length !== 1) continue;
-        const sql = orphanSql(t.rawName, rawOf(t, fk.columns[0]!), parent.rawName, rawOf(parent, fk.refColumns[0]!), (s) => `"${s}"`);
-        const sbx = await conn.execute<Record<string, unknown>>(sql, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
-        const inSandbox = toInt(sbx.rows?.[0]?.n, 'orphans');
+        const sql = orphanSql(sbx(t), rawOf(t, fk.columns[0]!), sbx(parent), rawOf(parent, fk.refColumns[0]!), (s) => `"${s}"`);
+        const orphanRes = await conn.execute<Record<string, unknown>>(sql, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
+        const inSandbox = toInt(orphanRes.rows?.[0]?.n, 'orphans');
         const childCol = t.source?.columns.find((c) => c.name === fk.columns[0]);
         const parentCol = parent.source?.columns.find((c) => c.name === fk.refColumns[0]);
         let inSource = 0;
@@ -225,7 +233,10 @@ export async function validatePlan(registry: Registry, deps: Deps, conflicts: Pl
         if (inSandbox !== inSource) issues.foreign_keys.push(`${t.name}.${fk.columns[0]}: ${inSandbox} orfao(s) no sandbox, ${inSource} na origem`);
       }
     }
-  }));
+    } finally {
+      await dropAll(conn);
+    }
+  });
 
   const checks: Check[] = [
     { name: 'row_count', passed: issues.row_count.length === 0, detail: counts.join(', ') || 'sem tabelas no dataset' },
@@ -238,6 +249,6 @@ export async function validatePlan(registry: Registry, deps: Deps, conflicts: Pl
     valid: checks.every((c) => c.passed),
     checks,
     issues: checks.filter((c) => !c.passed).map((c) => `${c.name}: ${c.detail}`),
-    sandbox: { schema: sandbox.schema },
+    sandbox: { schema: sandbox.schema, prefix, tables: loaded.map(sbx), dropped: true },
   };
 }

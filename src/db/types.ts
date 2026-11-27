@@ -73,7 +73,8 @@ export class DbLayerError extends Error {
       | 'CONNECTION_FAILED'
       | 'READ_ONLY_VIOLATION'
       | 'QUERY_FAILED'
-      | 'NOT_CONNECTED',
+      | 'NOT_CONNECTED'
+      | 'QUERY_TIMEOUT',
     message: string,
     public readonly cause?: unknown,
   ) {

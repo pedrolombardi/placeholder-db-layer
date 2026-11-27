@@ -8,6 +8,7 @@ import {
   Row,
 } from '../types';
 import { assertReadOnly } from '../readonly';
+import { limits } from '../../config/limits';
 
 export interface MySqlConfig {
   host: string;
@@ -83,10 +84,13 @@ export class MySqlAdapter implements DbAdapter {
     }
 
     try {
-      const [rows] = await this.pool.query(sql, params);
+      const [rows] = await this.pool.query({ sql, values: params, timeout: limits.queryTimeoutMs });
       const list = Array.isArray(rows) ? (rows as Row[]) : [];
       return { rows: list, rowCount: list.length };
     } catch (err) {
+      if ((err as { code?: string }).code === 'PROTOCOL_SEQUENCE_TIMEOUT') {
+        throw new DbLayerError('QUERY_TIMEOUT', `MySQL: consulta passou de ${limits.queryTimeoutMs} ms`, err);
+      }
       throw new DbLayerError('QUERY_FAILED', `MySQL: ${(err as Error).message}`, err);
     }
   }

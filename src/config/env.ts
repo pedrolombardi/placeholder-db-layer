@@ -25,6 +25,10 @@ const schema = z.object({
   // validado carregando o dataset anonimizado. Nunca o schema de destino.
   SBX_USER: z.string().min(1).default('sandbox'),
   SBX_PASSWORD: z.string().default('sandbox'),
+
+  // limites de custo das consultas (ver config/limits.ts)
+  QUERY_TIMEOUT_MS: z.coerce.number().int().min(100).default(15_000),
+  PROBE_MAX_ROWS: z.coerce.number().int().min(1).default(200_000),
 }).refine((e) => e.SBX_USER.toUpperCase() !== e.TGT_USER.toUpperCase(), {
   message: 'SBX_USER nao pode ser o usuario do destino: o sandbox nunca escreve no schema de destino',
   path: ['SBX_USER'],

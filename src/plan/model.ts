@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { NormColumn, NormSchema, NormTable, findColumn, findTable } from '../schema/types';
 
 /**
@@ -207,4 +208,18 @@ export function migrationScript(
   }
   if (suggestions.length > 0) lines.push('', ...suggestions);
   return { script: lines.join('\n') + '\n', statements };
+}
+
+/**
+ * Prefixo das tabelas de UMA validacao no schema SANDBOX ("S" + 8 hex do
+ * datasetId). Cada execucao tem as proprias tabelas: validacoes em paralelo
+ * nao leem o dado uma da outra.
+ */
+export function sandboxPrefix(runKey: string): string {
+  return `S${createHash('sha1').update(runKey).digest('hex').slice(0, 8).toUpperCase()}`;
+}
+
+/** Nome da tabela no sandbox; Oracle aceita identificadores de ate 128 caracteres. */
+export function sandboxTable(prefix: string, rawName: string): string {
+  return `${prefix}_${rawName}`.slice(0, 128);
 }

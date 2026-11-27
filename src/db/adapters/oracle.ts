@@ -8,6 +8,7 @@ import {
   Row,
 } from '../types';
 import { assertReadOnly } from '../readonly';
+import { limits } from '../../config/limits';
 
 /**
  * node-oracledb roda em modo "thin" por padrao (v6+), o que dispensa a
@@ -83,10 +84,14 @@ export class OracleAdapter implements DbAdapter {
     let conn: oracledb.Connection | undefined;
     try {
       conn = await this.pool.getConnection();
+      conn.callTimeout = limits.queryTimeoutMs;
       const res = await conn.execute<Row>(sql, params as oracledb.BindParameters);
       const rows = (res.rows ?? []) as Row[];
       return { rows, rowCount: rows.length };
     } catch (err) {
+      if (/call timeout|NJS-123|DPI-1067/i.test((err as Error).message)) {
+        throw new DbLayerError('QUERY_TIMEOUT', `Oracle: consulta passou de ${limits.queryTimeoutMs} ms`, err);
+      }
       throw new DbLayerError('QUERY_FAILED', `Oracle: ${(err as Error).message}`, err);
     } finally {
       if (conn) await conn.close();

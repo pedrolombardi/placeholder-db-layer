@@ -3,7 +3,8 @@ import { Registry } from '../db/registry';
 import { DbAdapter } from '../db/types';
 import { Deps } from '../deps';
 import { HttpError } from '../http';
-import { dialectFor } from '../schema/dialect';
+import { cappedSource, dialectFor } from '../schema/dialect';
+import { limits } from '../config/limits';
 import { ORACLE_MAX_BYTES } from '../schema/introspect';
 import { toInt, toIntOrNull } from '../schema/num';
 import { NormColumn, NormTable, Side, findColumn, findTable } from '../schema/types';
@@ -143,12 +144,13 @@ export async function profileColumn(registry: Registry, deps: Deps, input: z.inf
     params.push(threshold);
     select.push(`SUM(CASE WHEN ${measured} > ${d.param(1)} THEN 1 ELSE 0 END) AS ${d.quote('above')}`);
   }
-  const res = await r.adapter.query(`SELECT ${select.join(', ')} FROM ${d.quote(r.table.rawName)}`, params);
+  const res = await r.adapter.query(`SELECT ${select.join(', ')} FROM ${cappedSource(d, r.table.rawName, limits.probeMaxRows)}`, params);
   const row = res.rows[0] ?? {};
 
   return {
     ...header(r),
     totalRows: toInt(row.total, 'COUNT(*)'),
+    sampled: toInt(row.total, 'COUNT(*)') >= limits.probeMaxRows,
     nullCount: toIntOrNull(row.nulls, 'nullCount') ?? 0,
     distinctCount: toIntOrNull(row.distinct_count, 'distinctCount'),
     lengthThreshold: threshold,
@@ -182,17 +184,19 @@ export async function sampleValues(registry: Registry, deps: Deps, input: z.infe
     throw new HttpError(400, 'UNSUPPORTED_TYPE', `${r.column.type} nao permite amostra de distintos`);
   }
   const q = d.quote(r.column.rawName);
-  const t = d.quote(r.table.rawName);
+  const t = cappedSource(d, r.table.rawName, limits.probeMaxRows);
   const stats = await r.adapter.query(
-    `SELECT COUNT(${q}) AS ${d.quote('non_null')}, COUNT(DISTINCT ${q}) AS ${d.quote('distinct_count')} FROM ${t}`,
+    `SELECT COUNT(*) AS ${d.quote('total')}, COUNT(${q}) AS ${d.quote('non_null')}, COUNT(DISTINCT ${q}) AS ${d.quote('distinct_count')} FROM ${t}`,
   );
   const nonNullCount = toInt(stats.rows[0]?.non_null, 'COUNT(col)');
+  const sampled = toInt(stats.rows[0]?.total, 'COUNT(*)') >= limits.probeMaxRows;
   const distinctCount = toInt(stats.rows[0]?.distinct_count, 'COUNT(DISTINCT col)');
 
   if (!isCategorical(r.column, distinctCount, nonNullCount)) {
     return {
       ...header(r),
       masked: true,
+      sampled,
       reason: `alta cardinalidade (${distinctCount} distintos em ${nonNullCount} valores): pode ser dado pessoal, valores nao sao expostos`,
       distinctCount,
       nonNullCount,
@@ -211,6 +215,7 @@ export async function sampleValues(registry: Registry, deps: Deps, input: z.infe
   return {
     ...header(r),
     masked: false,
+    sampled,
     distinctCount,
     nonNullCount,
     values: rows.map((x) => x.v),

@@ -18,6 +18,8 @@ export interface ProbeRequest {
 
 export interface Probe {
   totalRows: number;
+  /** o teto de linhas (PROBE_MAX_ROWS) foi atingido: medicao sobre amostra */
+  sampled?: boolean;
   zeroDates?: number;
   nullCount?: number;
   distinct?: { value: unknown; count: number }[];

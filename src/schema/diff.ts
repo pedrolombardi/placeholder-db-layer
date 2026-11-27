@@ -9,6 +9,7 @@ export interface ProbeRunner {
 /** Probe como sai na API (contrato da secao 7: valuesAboveTarget, maxObservedLength). */
 export interface ProbeView {
   totalRows: number;
+  sampled?: boolean;
   valuesAboveTarget?: number;
   maxObservedLength?: number | null;
   /** unidade de maxObservedLength e targetLimit: a do destino (CHAR ou BYTE) */
@@ -148,6 +149,7 @@ export async function diffSchemas(source: NormSchema, target: NormSchema, runner
       }
       const probe = probes.get(sc.name) ?? null;
       const result = classify(sc, tc, probe, { targetCheckValues: checkInValues(tt, tc) });
+      if (probe?.sampled) result.warnings.push(`medido em amostra de ${probe.totalRows} linhas (PROBE_MAX_ROWS)`);
       entries.push({
         conflictId: `${st.name}.${sc.name}`,
         table: st.name,

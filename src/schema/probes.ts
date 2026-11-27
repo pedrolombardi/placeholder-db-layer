@@ -1,7 +1,8 @@
 import { DbAdapter } from '../db/types';
 import { Probe, ProbeRequest } from './classify';
 import { ProbeRunner } from './diff';
-import { dialectFor } from './dialect';
+import { cappedSource, dialectFor } from './dialect';
+import { limits } from '../config/limits';
 import { toInt, toIntOrNull } from './num';
 import { NormTable, findColumn } from './types';
 
@@ -42,13 +43,15 @@ export function sqlProbeRunner(db: DbAdapter): ProbeRunner {
         plan.push({ name, i, req, overflow });
       });
 
-      const res = await db.query(`SELECT ${select.join(', ')} FROM ${d.quote(table.rawName)}`, params);
+      const source = cappedSource(d, table.rawName, limits.probeMaxRows);
+      const res = await db.query(`SELECT ${select.join(', ')} FROM ${source}`, params);
       const row = res.rows[0] ?? {};
       const totalRows = toInt(row.total, 'COUNT(*)');
+      const sampled = totalRows >= limits.probeMaxRows;
       const out = new Map<string, Probe>();
 
       for (const { name, i, req, overflow } of plan) {
-        const probe: Probe = { totalRows };
+        const probe: Probe = { totalRows, ...(sampled ? { sampled: true } : {}) };
         if (req.zeroDate) probe.zeroDates = toIntOrNull(row[`z${i}`], 'zeroDates') ?? 0;
         if (req.nulls) probe.nullCount = toIntOrNull(row[`n${i}`], 'nullCount') ?? 0;
         if (overflow && req.overflow) {
@@ -62,7 +65,7 @@ export function sqlProbeRunner(db: DbAdapter): ProbeRunner {
           const col = findColumn(table, name)!;
           const q = d.quote(col.rawName);
           const r = await db.query(
-            d.limit(`SELECT ${q} AS ${d.quote('v')}, COUNT(*) AS ${d.quote('n')} FROM ${d.quote(table.rawName)} GROUP BY ${q} ORDER BY ${q}`, 101),
+            d.limit(`SELECT ${q} AS ${d.quote('v')}, COUNT(*) AS ${d.quote('n')} FROM ${source} GROUP BY ${q} ORDER BY ${q}`, 101),
           );
           probe.distinct = r.rows.map((x) => ({ value: x.v, count: toInt(x.n, 'COUNT(*)') }));
         }

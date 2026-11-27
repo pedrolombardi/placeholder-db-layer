@@ -27,6 +27,7 @@ export function parseBody<T extends z.ZodTypeAny>(schema: T, body: unknown): z.i
 const DB_STATUS: Record<DbLayerError['code'], number> = {
   CONNECTION_FAILED: 503,
   NOT_CONNECTED: 503,
+  QUERY_TIMEOUT: 504,
   QUERY_FAILED: 502,
   READ_ONLY_VIOLATION: 403,
 };

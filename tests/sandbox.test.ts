@@ -1,26 +1,18 @@
 import { describe, it, expect } from 'vitest';
-import { OracleSandbox } from '../src/sandbox/oracle-sandbox';
+import { sandboxPrefix, sandboxTable } from '../src/plan/model';
 
-/** As tabelas do SANDBOX tem nomes fixos: duas validacoes nao podem se sobrepor. */
-describe('OracleSandbox.exclusive', () => {
-  const sandbox = new OracleSandbox({ host: 'x', port: 1, serviceName: 'x', user: 'sandbox', password: 'x' });
-  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-  it('executa uma validacao por vez, na ordem de chegada', async () => {
-    const log: string[] = [];
-    const job = (name: string, ms: number) => sandbox.exclusive(async () => {
-      log.push(`${name}:inicio`);
-      await sleep(ms);
-      log.push(`${name}:fim`);
-      return name;
-    });
-    const results = await Promise.all([job('A', 30), job('B', 1)]);
-    expect(results).toEqual(['A', 'B']);
-    expect(log).toEqual(['A:inicio', 'A:fim', 'B:inicio', 'B:fim']);
+/** Cada validacao tem as proprias tabelas no SANDBOX: validacoes em paralelo nao se misturam. */
+describe('sandbox por migracao', () => {
+  it('prefixo deterministico por execucao e distinto entre execucoes', () => {
+    const a = sandboxPrefix('run-a');
+    expect(sandboxPrefix('run-a')).toBe(a);
+    expect(sandboxPrefix('run-b')).not.toBe(a);
   });
 
-  it('uma validacao que falha nao trava as seguintes', async () => {
-    await expect(sandbox.exclusive(async () => { throw new Error('ORA-00001'); })).rejects.toThrow('ORA-00001');
-    await expect(sandbox.exclusive(async () => 'ok')).resolves.toBe('ok');
+  it('gera identificador Oracle valido, mesmo para chaves estranhas', () => {
+    const p = sandboxPrefix('"; DROP TABLE CLIENTES; --');
+    expect(p).toMatch(/^S[0-9A-F]{8}$/);
+    expect(sandboxTable(p, 'CLIENTES')).toBe(`${p}_CLIENTES`);
+    expect(sandboxTable(p, 'X'.repeat(200))).toHaveLength(128);
   });
 });

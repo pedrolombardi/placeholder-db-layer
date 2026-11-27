@@ -25,6 +25,7 @@ const extractSchema = z
 const validateSchema = z
   .object({
     plan: planSchema,
+    datasetId: z.string().min(1).max(200).optional(),
     dataset: z
       .object({
         tables: z.array(
@@ -54,7 +55,7 @@ export function planRoutes(registry: Registry, deps: Deps): Router {
   router.post('/validate/plan', async (req, res) => {
     const input = parseBody(validateSchema, req.body);
     const started = Date.now();
-    const r = await validatePlan(registry, deps, input.plan.conflicts, input.dataset.tables);
+    const r = await validatePlan(registry, deps, input.plan.conflicts, input.dataset.tables, input.datasetId);
     res.json({ valid: r.valid, checks: r.checks, issues: r.issues, sandbox: r.sandbox, durationMs: Date.now() - started });
   });
 

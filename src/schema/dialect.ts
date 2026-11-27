@@ -40,6 +40,14 @@ export const oracleDialect: Dialect = {
   canDistinct: (col) => !ORACLE_LOBS.has(col.dataType),
 };
 
+/**
+ * Tabela vista como amostra: no maximo `max` linhas. Usada pelos probes e pelas
+ * tools; a tabela original continua acessivel pelo nome citado.
+ */
+export function cappedSource(d: Dialect, rawTable: string, max: number): string {
+  return `(${d.limit(`SELECT * FROM ${d.quote(rawTable)}`, max)}) ${d.quote('amostra')}`;
+}
+
 export function dialectFor(engine: string): Dialect {
   if (engine === 'mysql') return mysqlDialect;
   if (engine === 'oracle') return oracleDialect;
