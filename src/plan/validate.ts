@@ -103,7 +103,7 @@ function sandboxNullable(c: PlannedColumn, datasetInvalid: number, sourceInvalid
 }
 
 /** Valor do dataset convertido para o bind (string) no tipo planejado. */
-function toBind(c: PlannedColumn, v: unknown, converted: { n: number }): string | null {
+export function toBind(c: PlannedColumn, v: unknown, converted: { n: number }): string | null {
   if (v === null || v === undefined) return null;
   if (isDateType(c.base)) {
     const s = String(v);
@@ -113,7 +113,7 @@ function toBind(c: PlannedColumn, v: unknown, converted: { n: number }): string 
         return null;
       }
       if (c.onInvalid?.kind === 'default') {
-        converted.n++;
+        // vira um valor, nao um nulo: nao entra na contagem de nulos esperados
         return `${c.onInvalid.value} 00:00:00`;
       }
       return s; // sem decisao: o Oracle recusa, e isso vira uma falha da validacao
