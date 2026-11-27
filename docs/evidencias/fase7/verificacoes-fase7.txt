@@ -1,0 +1,15 @@
+# Verificacoes da Fase 7 contra a plataforma no ar (2026-11-27T16:15:27-03:00)
+## 1a chamada de tool depois de reiniciar o DB Layer (a AI Layer corta em 1000 ms)
+chamada 1: 0.525236s (HTTP 200)
+chamada 2: 0.234712s (HTTP 200)
+chamada 3: 0.244934s (HTTP 200)
+## contrato com a AI Layer + execucoes em paralelo pelo Core
+contrato AI  profile-column  email       -> OK campos ok (83 ms)
+contrato AI  sample-values   ativo       -> OK campos ok (14 ms)
+contrato AI  check-charset   email       -> OK campos ok (10 ms)
+contrato AI  profile-column  nao_existe  -> NO_DATA campos ok (9 ms)
+paralelo     paralela A  -> COMPLETED | verificacoes 5/5 | sandbox null
+paralelo     paralela B  -> COMPLETED | verificacoes 5/5 | sandbox null
+paralelo     duas execucoes em 736 ms
+## tabelas restantes no schema SANDBOX depois das execucoes
+0

@@ -10,5 +10,6 @@ Mapa de cada parte da atividade para os arquivos desta pasta.
 | 4. Arquitetura atualizada | [ARQUITETURA.md](ARQUITETURA.md) (diagramas em Mermaid; [arquitetura.png](arquitetura.png) e [arquitetura-interna.png](arquitetura-interna.png) para quem não renderiza Mermaid) |
 | 5. Teste de usabilidade | Do grupo, sobre o protótipo navegável (Front-end). O DB Layer não tem interface: ver [USABILIDADE.md](USABILIDADE.md) |
 | 6. Roadmap | [ROADMAP.md](ROADMAP.md) |
+| **Fase 7** | [FASE7.md](FASE7.md): o que mudou, testes e evidências ([evidencias/fase7/](evidencias/fase7/)) |
 
 Para regenerar as evidências: `docker compose up -d` e depois `npm run evidencias`.

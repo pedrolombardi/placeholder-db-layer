@@ -51,7 +51,7 @@ flowchart TB
   PRB --> ADP
   EXT --> ADP
   VAL --> ADP
-  VAL -->|uma validação por vez| SB[OracleSandbox]
+  VAL -->|tabelas próprias por execução| SB[OracleSandbox]
   ADP --> RO{{assertReadOnly<br/>na origem}}
 ```
 
@@ -69,7 +69,7 @@ flowchart TB
 | Datas, ENUM e flags vão preservadas para o Data Layer | A data zero é o defeito que o sandbox precisa reproduzir; não é dado pessoal |
 | Escrita **só** no schema SANDBOX, com usuário próprio (`SBX_USER ≠ TGT_USER`, checado no boot) | Validar exige carregar dados; a origem e o destino nunca são escritos |
 | `/plan/apply` **gera** o script de migração e não o executa | Aplicar em produção é um passo explícito do DBA (execução assistida: Fase 7) |
-| Sandbox aquecido no boot e validações serializadas | O primeiro DDL no Oracle levava ~13 s; as tabelas do sandbox têm nomes fixos |
+| Sandbox aquecido no boot; tabelas do sandbox com prefixo por execução (Fase 7) | O primeiro DDL no Oracle levava ~13 s; com tabelas próprias por execução, validações em paralelo não leem o dado uma da outra |
 
 ## Como suporta crescimento
 
@@ -84,8 +84,10 @@ flowchart TB
 ## Escalabilidade
 
 - **Análise e tools não guardam estado**: dá para subir N réplicas atrás de um balanceador.
-- **Validação**: uma por vez por schema SANDBOX, porque as tabelas têm nomes fixos. Para
-  validar migrações em paralelo, a Fase 7 prevê um schema de sandbox por migração.
+- **Validação**: em paralelo. Cada execução usa tabelas próprias no SANDBOX (prefixo derivado
+  do `datasetId`) e as apaga no fim (Fase 7).
+- **Custo limitado**: toda consulta tem limite de tempo (`QUERY_TIMEOUT_MS`), e probes e tools
+  leem no máximo `PROBE_MAX_ROWS` linhas, com `sampled: true` quando o teto é atingido.
 - **O trabalho pesado fica no banco**: probes e fatos da origem são agregados (`COUNT`, `MAX`,
   `SUM CASE`), e o que trafega são números. A extração para o sandbox é limitada a 1.000 linhas
   por tabela.
@@ -95,7 +97,7 @@ flowchart TB
 ## Manutenção
 
 - **TypeScript estrito**, com configuração validada no boot (falha alto se faltar variável).
-- **43 testes**; CI (lint, typecheck, testes, build) e publicação da imagem
+- **50 testes**; CI (lint, typecheck, testes, build) e publicação da imagem
   `ghcr.io/pedrolombardi/placeholder-db-layer` a cada push na `main`.
 - **Reprodutível**: `docker compose up` sobe origem, destino, sandbox e o serviço sem
   configuração manual; `npm run evidencias` regera as evidências.

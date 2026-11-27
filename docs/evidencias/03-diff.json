@@ -114,7 +114,10 @@
           "charset": "AL32UTF8",
           "collation": "USING_NLS_COMP"
         },
-        "probe": null,
+        "probe": {
+          "totalRows": 10,
+          "emptyStrings": 0
+        },
         "id": "clientes.nome",
         "kind": "mechanical",
         "sourceType": "VARCHAR(120)",
@@ -172,6 +175,7 @@
         },
         "probe": {
           "totalRows": 10,
+          "emptyStrings": 0,
           "valuesAboveTarget": 2,
           "maxObservedLength": 226,
           "unit": "BYTE",
@@ -233,6 +237,7 @@
         },
         "probe": {
           "totalRows": 10,
+          "emptyStrings": 0,
           "valuesAboveTarget": 0,
           "maxObservedLength": 11,
           "unit": "BYTE",
@@ -641,7 +646,10 @@
           "charset": "AL32UTF8",
           "collation": "USING_NLS_COMP"
         },
-        "probe": null,
+        "probe": {
+          "totalRows": 4,
+          "emptyStrings": 0
+        },
         "id": "eventos.tipo",
         "kind": "mechanical",
         "sourceType": "VARCHAR(60)",
@@ -978,7 +986,10 @@
           "charset": "AL32UTF8",
           "collation": "USING_NLS_COMP"
         },
-        "probe": null,
+        "probe": {
+          "totalRows": 6,
+          "emptyStrings": 0
+        },
         "id": "pedidos.status",
         "kind": "mechanical",
         "sourceType": "ENUM('novo','pago','enviado','cancelado')",
@@ -1086,7 +1097,10 @@
           "charset": "AL32UTF8",
           "collation": "USING_NLS_COMP"
         },
-        "probe": null,
+        "probe": {
+          "totalRows": 6,
+          "emptyStrings": 0
+        },
         "id": "pedidos.observacao",
         "kind": "mechanical",
         "sourceType": "TEXT",

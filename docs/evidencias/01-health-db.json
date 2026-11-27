@@ -14,17 +14,17 @@
       "schema": "vendas",
       "charset": "utf8mb4",
       "readOnly": true,
-      "latencyMs": 4
+      "latencyMs": 2
     },
     "target": {
       "connected": true,
       "engine": "oracle",
       "role": "target",
-      "version": "23.26.3.0.0",
+      "version": "23.26.4.0.0",
       "schema": "VENDAS",
       "charset": "AL32UTF8",
       "readOnly": false,
-      "latencyMs": 3
+      "latencyMs": 2
     }
   }
 }

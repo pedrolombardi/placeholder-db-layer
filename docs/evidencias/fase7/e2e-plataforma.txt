@@ -1,0 +1,23 @@
+# e2e da plataforma com o DB Layer da Fase 7 (branch fase7-db-layer) e a AI Layer do PR #2 (ErickGruber/fase7-ai-layer)
+# 2026-11-27T16:15:25-03:00
+migração 94bb3b3b-1688-427a-9699-fe49aeb314cd
+análise: 3 tabelas e 20 conflitos: 15 resolvidos por regra, 1 propostos pela IA, 4 aguardando decisão humana.
+  ok  análise termina aguardando homologação
+  ok  20 colunas classificadas
+  ok  15 resolvidas por regra (DB Layer)
+  ok  clientes.email: IA propõe VARCHAR2(300 CHAR) com evidência real
+  ok  clientes.ativo: IA devolve DEFER (valores 0, 1 e 2)
+execução: COMPLETED
+    ✓ row_count: clientes 10/10, pedidos 6/6, eventos 4/4
+    ✓ silent_truncation: nenhum valor excede o tipo planejado
+    ✓ foreign_keys: pedidos.cliente_id -> clientes: 0 orfao(s) no sandbox, 0 na origem; eventos.pedido_id -> pedidos: 0 orfao(s) no sandbox, 0 na origem
+    ✓ type_precision_scale: tipos, precisao e escala preservados
+    ✓ null_count: nulos consistentes (incluindo conversoes decididas)
+  ok  migração COMPLETED
+  ok  Data Layer: anonimização aprovada (leakage/referential)
+  ok  5 verificações do sandbox aprovadas
+  ok  script amplia EMAIL para VARCHAR2(300 CHAR)
+  ok  script aceita NULL em PEDIDOS.CRIADO_EM (decisão humana sobre a data zero)
+  ok  trilha de auditoria completa
+
+E2E OK

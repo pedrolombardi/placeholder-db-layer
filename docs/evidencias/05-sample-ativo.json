@@ -17,6 +17,7 @@
     "table": "clientes",
     "column": "ativo",
     "masked": false,
+    "sampled": false,
     "distinctCount": 3,
     "nonNullCount": 10,
     "values": [

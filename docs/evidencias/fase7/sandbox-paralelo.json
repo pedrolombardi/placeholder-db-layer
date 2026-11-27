@@ -1,0 +1,48 @@
+{
+  "observacao": "Duas chamadas simultaneas a /validate/plan com datasetIds diferentes: cada uma usa tabelas proprias no SANDBOX (prefixo) e as apaga no fim. O dataset da origem nao e gravado neste arquivo.",
+  "duracaoMs": 446,
+  "resultados": [
+    {
+      "datasetId": "execucao-A",
+      "valid": true,
+      "checks": [
+        "OK row_count",
+        "OK silent_truncation",
+        "OK foreign_keys",
+        "OK type_precision_scale",
+        "OK null_count"
+      ],
+      "sandbox": {
+        "schema": "SANDBOX",
+        "prefix": "S964C8B06",
+        "tables": [
+          "S964C8B06_CLIENTES",
+          "S964C8B06_PEDIDOS",
+          "S964C8B06_EVENTOS"
+        ],
+        "dropped": true
+      }
+    },
+    {
+      "datasetId": "execucao-B",
+      "valid": true,
+      "checks": [
+        "OK row_count",
+        "OK silent_truncation",
+        "OK foreign_keys",
+        "OK type_precision_scale",
+        "OK null_count"
+      ],
+      "sandbox": {
+        "schema": "SANDBOX",
+        "prefix": "S6ED41A4A",
+        "tables": [
+          "S6ED41A4A_CLIENTES",
+          "S6ED41A4A_PEDIDOS",
+          "S6ED41A4A_EVENTOS"
+        ],
+        "dropped": true
+      }
+    }
+  ]
+}

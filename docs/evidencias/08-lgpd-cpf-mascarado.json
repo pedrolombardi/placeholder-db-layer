@@ -17,6 +17,7 @@
     "table": "clientes",
     "column": "cpf",
     "masked": true,
+    "sampled": false,
     "reason": "alta cardinalidade (7 distintos em 7 valores): pode ser dado pessoal, valores nao sao expostos",
     "distinctCount": 7,
     "nonNullCount": 7,

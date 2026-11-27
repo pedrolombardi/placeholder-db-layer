@@ -100,7 +100,7 @@ A primeira conexão e o primeiro DDL no Oracle levavam ~13 s; o sandbox agora é
 
 ## 6. Qualidade
 
-43 testes automatizados ([saída](evidencias/testes.txt)) cobrindo:
+50 testes automatizados ([saída](evidencias/testes.txt)) cobrindo:
 - o classificador, com o schema real do seed como fixture;
 - a normalização dos catálogos;
 - a guarda de somente-leitura;
@@ -108,3 +108,15 @@ A primeira conexão e o primeiro DDL no Oracle levavam ~13 s; o sandbox agora é
 - as rotas, com bancos falsos.
 
 O CI no GitHub Actions roda lint, typecheck, testes e build.
+
+## 7. Fase 7
+
+Detalhes, decisões e evidências em [FASE7.md](FASE7.md). Em resumo:
+
+- **Riscos fechados:** vulnerabilidades de dependências (17 → 0); validações concorrentes no
+  sandbox (tabelas próprias por execução); consulta sem limite de tempo na origem (504 em vez
+  de travar); texto vazio virando NULL em silêncio (regra nova).
+- **Integração verificada:** plataforma completa com a AI Layer da Fase 7 (PR #2 do Erick) e este
+  DB Layer: e2e verde; 1ª chamada de tool a frio em ~0,5 s (a AI corta em 1 s); duas execuções
+  simultâneas concluídas com 5/5 verificações e o sandbox limpo no fim.
+

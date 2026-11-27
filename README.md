@@ -45,6 +45,13 @@ npm run dev                        # tsx watch, porta 3002
 npm test && npm run typecheck && npm run lint && npm run build
 ```
 
+## Limites de custo (Fase 7)
+
+| Variável | Padrão | Efeito |
+|---|---|---|
+| `QUERY_TIMEOUT_MS` | `15000` | Nenhuma consulta segura uma conexão por mais que isso (MySQL `timeout`, Oracle `callTimeout`). Estouro → **504** `QUERY_TIMEOUT` |
+| `PROBE_MAX_ROWS` | `200000` | Teto de linhas lidas pelos probes do diff e pelas tools. Atingido o teto, a resposta vem com `sampled: true` e o diff avisa. A validação final do plano lê a tabela inteira |
+
 ## Endpoints (porta 3002)
 
 | Método | Rota | Descrição |
@@ -55,7 +62,7 @@ npm test && npm run typecheck && npm run lint && npm run build
 | GET | `/schema/introspect?side=source\|target` | modelo normalizado; um lado → `{side, engine, schema, tables}`, sem parâmetro → `{source, target}`. `?connection=` é sinônimo (usado pelo Core) |
 | POST | `/schema/diff` | todas as colunas pareadas, `mecanico \| julgamento`, com regra e motivo |
 | POST | `/extract/sample` | `{tables?, limit?}` → amostra da origem no formato do `/v1/anonymize` do Data Layer (datas, ENUM e flags em `options.preserve`) |
-| POST | `/validate/plan` | `{plan, dataset}` → fatos da origem contra os tipos planejados + carga do dataset anonimizado no schema **SANDBOX** do Oracle: `row_count`, `silent_truncation`, `foreign_keys`, `type_precision_scale`, `null_count` |
+| POST | `/validate/plan` | `{plan, dataset, datasetId?}` → fatos da origem contra os tipos planejados + carga do dataset anonimizado no schema **SANDBOX** do Oracle, em tabelas próprias da execução (prefixo do `datasetId`), apagadas no fim: `row_count`, `silent_truncation`, `foreign_keys`, `type_precision_scale`, `null_count` |
 | POST | `/plan/apply` | `{plan}` → **script de migração** para o destino (`applied: false`, `mode: "script"`): o DB Layer não escreve no destino |
 | POST | `/tools/profile-column` | `{database, table, column, threshold?}` → tamanhos, nulos, quantos estouram |
 | POST | `/tools/sample-values` | `{database, table, column, limit?}` → valores distintos e contagens. Coluna com muitos valores diferentes (CPF, e-mail) volta `masked: true`, sem os valores (LGPD) |
@@ -133,7 +140,7 @@ src/
   routes/                health, connections, schema, tools
 seeds/                   origem (MySQL) com os conflitos; destino (Oracle) propositalmente imperfeito
 scripts/                 demo.ts (ponta a ponta com a AI Layer), evidencias.ts
-tests/                   43 testes (Vitest + Supertest; contrato do Core em core-contract), fixture = schema real do seed
+tests/                   50 testes (Vitest + Supertest; contrato do Core em core-contract), fixture = schema real do seed
 docs/                    entrega: evidências, validação técnica, arquitetura, usabilidade, roadmap
 ```
 

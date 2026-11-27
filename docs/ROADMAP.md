@@ -16,18 +16,27 @@
 - [x] Plataforma completa (`placeholder-platform`): um `docker compose up` com todos os serviços e o front, mais o e2e no CI
 - [x] 43 testes, CI + publicação da imagem, `docker compose` sem configuração manual, evidências reproduzíveis
 
-## Fase 7 — prioridades
+## Entregue na Fase 7
+
+Detalhes e evidências em [FASE7.md](FASE7.md).
+
+- [x] **Segurança das dependências**: `npm audit` de 17 vulnerabilidades (2 críticas) para 0
+- [x] **Um sandbox por migração**: tabelas próprias por execução; validações em paralelo
+- [x] **Limite de tempo e teto de linhas** nas consultas da origem (`QUERY_TIMEOUT_MS`, `PROBE_MAX_ROWS`)
+- [x] **Regra nova**: texto vazio vira NULL no Oracle (`EMPTY_STRING_NOT_NULL`)
+- [x] **Compatibilidade com a AI Layer da Fase 7** (PR #2): contrato das tools e limite de 1 s validados; e2e da plataforma verde
+- [x] 50 testes
+
+## Próximas prioridades (depois da Fase 7)
 
 | Prio | Entrega | Por quê |
 |---|---|---|
 | P1 | **Autenticação entre serviços** (token por serviço) | Nenhum endpoint deveria ficar aberto fora da rede local |
-| P1 | **Um schema de sandbox por migração** | Hoje as validações são serializadas, porque as tabelas do sandbox têm nomes fixos |
-| P1 | **Amostragem e limite de tempo nos probes** | Ler a tabela inteira inviabiliza tabelas grandes de produção |
 | P1 | **Credenciais por migração** (Connection Manager): hoje o DB Layer usa as conexões configuradas e recusa outras com 400 | O Core já envia host/database/usuário da origem |
 | P1 | **Execução assistida do script** no destino, com carga dos dados e verificação pós-carga | Hoje o DB Layer gera o script e o DBA executa |
-| P2 | **Amostragem estratificada** na extração (hoje: primeiras 1.000 linhas por PK) | A amostra precisa representar a tabela inteira |
+| P2 | **Amostragem representativa** nos probes e na extração (hoje: teto de linhas e as primeiras 1.000 por PK) | O teto limita o custo; a amostra ainda não representa a tabela inteira |
 | P2 | **Cache do catálogo** com expiração | Cada chamada de tool relê os dois catálogos hoje |
-| P2 | **Regras novas**: string vazia vira NULL no Oracle (quebra `NOT NULL`); defaults; índices únicos com prefixo | Mais riscos que hoje passam em silêncio ficam visíveis |
+| P2 | **Regras novas**: defaults; índices únicos com prefixo | Mais riscos que hoje passam em silêncio ficam visíveis |
 | P2 | **Teste de usabilidade com desenvolvedores** que consomem a API (roteiro em USABILIDADE.md) | Medir o tempo até a primeira integração e onde a documentação trava |
 | P3 | **Adaptador PostgreSQL** | Prova que a arquitetura de adaptadores escala para um terceiro banco |
 | P3 | **Observabilidade**: logs estruturados (ex. `pino`) e métricas por probe | Diagnóstico em produção |

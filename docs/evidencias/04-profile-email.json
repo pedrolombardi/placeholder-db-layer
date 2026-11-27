@@ -17,6 +17,7 @@
     "table": "clientes",
     "column": "email",
     "totalRows": 10,
+    "sampled": false,
     "nullCount": 0,
     "distinctCount": 10,
     "lengthThreshold": 200,
